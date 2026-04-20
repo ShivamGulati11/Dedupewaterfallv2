@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-DedupeWaterfall.Orchestrator-b2569efe-18d1-4092-a0eb-76d2d270bf80</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Confluent.Kafka" Version="2.4.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DedupeWaterfall.Core\DedupeWaterfall.Core.csproj" />
+    <ProjectReference Include="..\DedupeWaterfall.Data\DedupeWaterfall.Data.csproj" />
+  </ItemGroup>
+</Project>

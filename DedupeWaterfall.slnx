@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="DedupeWaterfall.Core/DedupeWaterfall.Core.csproj" />
+  <Project Path="DedupeWaterfall.Data/DedupeWaterfall.Data.csproj" />
+  <Project Path="DedupeWaterfall.Orchestrator/DedupeWaterfall.Orchestrator.csproj" />
+</Solution>
