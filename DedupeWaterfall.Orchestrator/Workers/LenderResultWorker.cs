@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Confluent.Kafka;
 using DedupeWaterfall.Core.Interfaces;
@@ -17,21 +18,24 @@ public class LenderResultWorker : BackgroundService
 {
     private readonly KafkaConsumerFactory        _consumerFactory;
     private readonly IServiceScopeFactory        _scopeFactory;
+    private readonly IKafkaProducer              _kafkaProducer;
     private readonly OrchestratorOptions         _orchestratorOptions;
     private readonly string                      _groupId;
     private readonly ILogger<LenderResultWorker> _logger;
 
-    private readonly Dictionary<Guid, int> _failureCounts = new();
+    private readonly ConcurrentDictionary<Guid, int> _failureCounts = new();
 
     public LenderResultWorker(
         KafkaConsumerFactory       consumerFactory,
         IServiceScopeFactory       scopeFactory,
+        IKafkaProducer             kafkaProducer,
         IOptions<KafkaOptions>     kafkaOptions,
         IOptions<OrchestratorOptions> orchestratorOptions,
         ILogger<LenderResultWorker> logger)
     {
         _consumerFactory     = consumerFactory;
         _scopeFactory        = scopeFactory;
+        _kafkaProducer       = kafkaProducer;
         _orchestratorOptions = orchestratorOptions.Value;
         _groupId             = kafkaOptions.Value.ConsumerGroups.LenderResult;
         _logger              = logger;
@@ -72,7 +76,7 @@ public class LenderResultWorker : BackgroundService
                 consumer.StoreOffset(result);
                 consumer.Commit(result);
 
-                _failureCounts.Remove(message.MessageId);
+                _failureCounts.TryRemove(message.MessageId, out _);
             }
             catch (OperationCanceledException)
             {
@@ -103,7 +107,11 @@ public class LenderResultWorker : BackgroundService
                     await RouteToDlqAsync(result, stoppingToken);
                     consumer.StoreOffset(result);
                     consumer.Commit(result);
-                    _failureCounts.Remove(messageId);
+                    _failureCounts.TryRemove(messageId, out _);
+                }
+                else if (_orchestratorOptions.RetryDelayMs > 0)
+                {
+                    await Task.Delay(_orchestratorOptions.RetryDelayMs, stoppingToken);
                 }
             }
         }
@@ -114,10 +122,8 @@ public class LenderResultWorker : BackgroundService
     private async Task RouteToDlqAsync(
         ConsumeResult<string, string> result, CancellationToken ct)
     {
-        await using var scope = _scopeFactory.CreateAsyncScope();
-        var producer = scope.ServiceProvider.GetRequiredService<IKafkaProducer>();
-
-        await producer.ProduceAsync(
+        // Re-publish the raw value to the DLQ topic using the singleton producer
+        await _kafkaProducer.ProduceAsync(
             topic:   $"{KafkaTopics.LenderResult}.dlq",
             key:     result.Message.Key ?? string.Empty,
             message: result.Message.Value,
