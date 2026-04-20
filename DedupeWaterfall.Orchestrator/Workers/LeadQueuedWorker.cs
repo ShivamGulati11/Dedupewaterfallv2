@@ -96,9 +96,10 @@ public class LeadQueuedWorker : BackgroundService
                     "LeadId={LeadId} RunId={RunId}",
                     messageId, leadId, runId);
 
-                _failureCounts.TryGetValue(messageId, out int failures);
-                failures++;
-                _failureCounts[messageId] = failures;
+                int failures = _failureCounts.AddOrUpdate(
+                    messageId,
+                    addValue:     1,
+                    updateValueFactory: (_, current) => current + 1);
 
                 if (failures >= _orchestratorOptions.MaxRetryCount && result is not null)
                 {
